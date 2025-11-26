@@ -1,0 +1,53 @@
+%% USER INPUTS
+Fs_dac     = 200e6;      % DAC sample rate
+dwell_time = 200e-6;     % time per frequency step (sec)
+f_start    = 5e6;        % start frequency
+f_stop     = 25e6;       % stop frequency
+f_step     = 1e6;        % step size
+
+%% DERIVED PARAMS
+freqs = f_start : f_step : f_stop;   % list of step freqs
+Nstep = length(freqs);               % number of steps
+
+Ns = round(dwell_time * Fs_dac);     % samples per step (rounded)
+Ts = 1/Fs_dac;                       % sampling period
+
+total_samples = Nstep * Ns;          % final waveform length
+t = (0:total_samples-1).' * Ts;      % full time vector
+
+%% PHASE-CONTINUOUS DDS-LIKE GENERATION
+phase = zeros(total_samples,1);
+
+idx = 1;
+for k = 1:Nstep
+    f = freqs(k);
+
+    % instantaneous phase increment for this frequency
+    dphi = 2*pi*f / Fs_dac;
+
+    % generate Ns samples
+    for n = 1:Ns
+        if idx == 1
+            phase(idx) = 0;
+        else
+            phase(idx) = phase(idx-1) + dphi;
+        end
+        idx = idx + 1;
+    end
+end
+
+%% WRAP PHASE IN SINGLE PASS
+phase = mod(phase, 2*pi);
+
+%% GENERATE OUTPUT SIGNAL (CONSTANT AMPLITUDE)
+x = sin(phase);          % can also use cos()
+
+%% OPTIONAL: SCALE TO DAC RANGE
+% dac_bits = 14;
+% x_dac = floor((x+1)/2 * (2^dac_bits - 1));
+
+%% DONE
+disp("Waveform generated:");
+disp("Samples: " + total_samples);
+disp("Steps:   " + Nstep);
+disp("Time length (s): " + total_samples/Fs_dac);
