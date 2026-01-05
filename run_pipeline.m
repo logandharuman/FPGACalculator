@@ -1,22 +1,28 @@
-function run_pipeline(x, fs, model, iqMode)
+function run_pipeline(x, fs, modelData, iqMode)
 
 if nargin < 4
-    iqMode = isreal(x) == 0;
+    iqMode = ~isreal(x);
 end
 
-[xDigital, digScore] = digital_predetector_iq(x, fs, iqMode);
+model = modelData.SVM;
+mu    = modelData.mu;
+sigma = modelData.sigma;
 
-if xDigital
-    fprintf("DIGITAL-like signal detected | Score %.2f\n", digScore);
+[isDigital, digScore] = digital_predetector_iq(x, fs, iqMode);
+
+if isDigital
+    fprintf("DIGITAL-like detected | Score %.2f\n", digScore);
     return;
 end
 
 f = extract_features_iq(x, fs, iqMode);
-[label, score] = predict(model, f);
+fn = (f - mu) ./ sigma;
 
-confidence = max(abs(score));
+[label, score] = predict(model, fn);
 
-fprintf("Detected: %s | Confidence: %.2f\n", label, confidence);
+conf = max(abs(score));
 
-decision_logic(label, confidence);
+fprintf("Detected: %s | Confidence: %.2f\n", string(label), conf);
+
+decision_logic(label, conf);
 end
