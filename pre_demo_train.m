@@ -10,30 +10,32 @@ X = []; Y = [];
 for m = mods
     for k = 1:50
         x = gen_signal(m, fs, t);
-        x = add_awgn(x, 12);      % HIGH SNR TRAINING
+        x = add_awgn(x, 12);      % HIGH SNR
         f = extract_features_iq(x, fs);
         X = [X; f];
         Y = [Y; m];
     end
 end
 
-% Train base SVM
-SVM = fitcsvm(X,Y,...
-    'KernelFunction','rbf',...
-    'Standardize',true);
+Y = categorical(Y);
+
+% --- MANUAL STANDARDIZATION ---
+mu = mean(X,1);
+sigma = std(X,[],1) + eps;
+Xn = (X - mu) ./ sigma;
+
+% --- MULTI-CLASS SVM via ECOC ---
+tSVM = templateSVM('KernelFunction','rbf');
+
+SVM = fitcecoc(Xn, Y, ...
+    'Learners', tSVM, ...
+    'Coding','onevsone');
 
 % --- CROSS VALIDATION ---
 CVSVM = crossval(SVM,'KFold',5);
 cvLoss = kfoldLoss(CVSVM);
-cvAccuracy = (1 - cvLoss)*100;
+cvAccuracy = (1-cvLoss)*100;
 
-fprintf("\n📊 Cross-Validated Accuracy: %.2f %%\n", cvAccuracy);
+fprintf("Cross-Validated Accuracy: %.2f %%\n", cvAccuracy);
 
-% --- CONFUSION MATRIX ---
-pred = kfoldPredict(CVSVM);
-confMat = confusionmat(Y,pred);
-
-disp("Confusion Matrix:");
-disp(confMat);
-
-save('AMC_MODEL.mat','SVM','fs','N','cvAccuracy','confMat');
+save('AMC_MODEL.mat','SVM','mu','sigma','fs','N','cvAccuracy');
