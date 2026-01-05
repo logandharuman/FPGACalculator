@@ -1,4 +1,3 @@
-function model = load_model()
-data = load('AMC_MODEL.mat');
-model = data.SVM;
+function modelData = load_model()
+modelData = load('AMC_MODEL.mat');
 end
