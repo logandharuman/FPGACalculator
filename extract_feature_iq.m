@@ -1,29 +1,26 @@
 function f = extract_features_iq(x, fs, iqMode)
-
-if iqMode
+    x = x(:).'; 
+    if ~iqMode || isreal(x), x = hilbert(x); end
+    x = x / (sqrt(mean(abs(x).^2)) + eps);
     env = abs(x);
-    phase = unwrap(angle(x));
-    inst_freq = diff(phase);
-else
-    env = abs(hilbert(x));
-    inst_freq = diff(angle(hilbert(x)));
-end
+    
+    % 1. DSB-SC vs PM Identifier: Variance of squared envelope
+    % DSB-SC envelope fluctuates heavily; PM is near constant
+    gamma_env = var(env.^2) / (mean(env.^2)^2 + eps);
 
-env_var = var(env);
-freq_var = var(inst_freq);
+    % 2. Frequency/Phase Jitter
+    inst_freq = [0, diff(unwrap(angle(x)))];
+    std_freq = std(inst_freq);
+    kurt_freq = kurtosis(inst_freq);
 
-zcr = sum(abs(diff(sign(real(x)))))/length(x);
+    % 3. HOS for Digital/Noise robustness
+    m20 = mean(x.^2); m21 = mean(abs(x).^2); m42 = mean(abs(x).^4);
+    C42 = abs(m42 - abs(m20)^2 - 2*m21^2);
+    q_c42 = C42 / (m21^2 + eps); 
 
-X = abs(fft(real(x)));
-X = X(1:end/2);
-X = X / sum(X);
+    % 4. Spectral "Peak-to-Average" (Carrier vs FM)
+    X_fft = abs(fft(x, 1024));
+    sfm = geomean(X_fft+eps) / mean(X_fft+eps); % Spectral Flatness
 
-freq = linspace(0, fs/2, length(X));
-centroid = sum(freq .* X);
-
-flatness = geomean(X+eps)/mean(X+eps);
-
-kurt = kurtosis(real(x));
-
-f = [env_var freq_var zcr centroid flatness kurt];
+    f = [gamma_env, std_freq, kurt_freq, q_c42, sfm];
 end
