@@ -1,0 +1,7 @@
+function y = add_awgn(x, SNRdB)
+
+Ps = mean(x.^2);
+Pn = Ps / (10^(SNRdB/10));
+
+y = x + sqrt(Pn)*randn(size(x));
+end
